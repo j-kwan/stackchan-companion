@@ -1,0 +1,66 @@
+# PlatformIO
+.pio/
+.pioenvs/
+.piolibdeps/
+
+# IDE
+.vscode/
+.idea/
+*.code-workspace
+
+# macOS
+.DS_Store
+._*
+
+# Build artifacts
+*.o
+*.d
+*.elf
+*.bin
+*.hex
+*.map
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Logs
+*.log
+
+# Polices converties (.vlw) : elles derivent d'un TTF sous licence tierce, dont
+# la redistribution n'est generalement pas accordee. Aucune n'est versionnee ici.
+# (Le firmware n'en charge aucune : il n'utilise que les polices integrees a
+#  LovyanGFX. Cette regle protege un fichier depose localement dans sdcard/.)
+sdcard/*.vlw
+
+# Reponses NOTAM capturees (tools/autorouter-notam.py). Elles servent a ecrire
+# le parseur contre une VRAIE reponse, pas a etre redistribuees : la donnee
+# vient d'EUROCONTROL EAD via autorouter et n'est pas a nous.
+notam-*.json
+# Bearer token cache for tools/autorouter-notam.py (7-day token for an
+# account that can file flight plans - never commit it).
+tools/.autorouter-token.json
+
+# Header GENERE par scripts/gen_console_gz.py (gzip des pages de
+# src/app/WebConsole.h, regenere avant chaque build de l'env companion). Le
+# versionner, c'est 140 Ko de tableaux d'octets en diff a chaque retouche du
+# markup -- et une source de verite en double.
+src/app/WebConsoleGz.h
+
+# Documents SIA tiers deposes localement (FAQ, catalogues XLSX). Ils ont leurs
+# propres conditions et n'ont rien a faire dans un depot public sous AGPL-3.0 ;
+# ils sont re-telechargeables depuis le compte SIA de leur proprietaire.
+docs/assets/sia.aviation-civile/
+
+# Kit de deploiement genere (companion.bin + arborescence sdcard/).
+# Reconstruit a la demande, jamais suivi : 7 Mo de binaires.
+tmp/
+
+# Fichiers de release (scripts/release/make-release.ps1) : binaires publies
+# comme pieces jointes de la release GitHub, jamais versionnes.
+dist/
+
+# Espace memoire/echange prive avec Claude pour ce projet (brouillons,
+# correspondance, notes de travail) - jamais publie, sur aucun remote.
+unpublished/

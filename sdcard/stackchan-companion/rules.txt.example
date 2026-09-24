@@ -1,0 +1,60 @@
+# rules.txt - StackChan reactive plugins. One rule per line, '#' = comment.
+# Hot reload: the console's Rules section, or POST /api/rules/reload.
+# Edit it from the console: Files tab > Configurations > rules.txt.
+#
+# FORMAT
+#   enable | field | op | value | sustainMs | cooldownMs | action | a1 | a2
+#
+#   enable      GATE: the rule sleeps while THIS field is < 0.5.
+#               Empty = always active.
+#   field       what is watched. Published by the robot itself:
+#                 batt chg rssi cam night mic micL micR light dark_sleepy ip
+#               Anything else is yours: POST /api/field?name=value
+#   op          gt  ge  lt  le  eq  ne
+#   value       the threshold, a number
+#   sustainMs   the condition must HOLD this long before firing (0 = at once)
+#   cooldownMs  minimum delay between two firings of the same rule
+#   action      SetEmotion <name> [ms] | PlayDance <name> | Blink
+#               | WinkLeft | WinkRight | AmbientDark <0|1> | set <field> <val>
+#
+# HELD EDGE. A rule fires ONCE, when its condition becomes true and stays true
+# for sustainMs. It re-arms only when the condition goes false again - so a
+# field parked above its threshold does not spam the robot.
+#
+# SAFE BY CONSTRUCTION. A rule can only post whitelisted commands: it cannot
+# draw on the screen and it cannot brick the robot. The reflexes (shake ->
+# Scared, lift -> Curious) outrank every rule. And an unknown field reads 0,
+# so a rule written for a source you do not run simply never fires.
+#
+# LINE LIMIT 127 BYTES. A longer line is DISCARDED whole, not truncated.
+#
+# =========================================================================
+# CLAUDE CODE - THE CONTEXT GAUGE.  These four are LIVE, not examples.
+# =========================================================================
+# They are gated on `claude`, and only the statusline bridge pushes that
+# field (scripts/dev/claude-statusline.ps1, or the .sh twin on Linux). Until
+# you install it, `claude` reads 0 and none of them can fire. Install it and
+# they need nothing else - the same script pushes `ctx`, the percentage of
+# the context window in use. It sets `claude` to 1 ONLY while it can
+# actually compute `ctx`, so these never fire on a missing number.
+#
+# Watch it on the band too: mode Gauges (console, or POST
+# /api/statusbar?mode=3) shows g0 with the CTX label the bridge sets.
+#
+# Getting full: a first warning, well before it hurts.
+claude | ctx | ge | 75 | 3000  | 120000 | SetEmotion | Worried | 4000
+# Nearly full: this is the one worth reacting to.
+claude | ctx | ge | 90 | 3000  | 60000  | SetEmotion | Scared  | 4000
+# About to compact - the robot shakes its head, once every five minutes.
+claude | ctx | ge | 97 | 2000  | 300000 | PlayDance  | shakeNo
+# Fresh window, room to work. Held ten seconds so a compaction
+# does not read as celebration.
+claude | ctx | lt | 20 | 10000 | 600000 | SetEmotion | Happy   | 3000
+#
+# --- More to copy, all inactive (leading '#') ------------------------------
+# Battery under 15 %, at most once a minute:
+#  | batt | lt | 15 | 0 | 60000 | SetEmotion | Worried
+# A loud noise startles it (needs the microphone on):
+#  | micL | gt | 0.95 | 0 | 4000 | SetEmotion | Surprised | 1500
+# Your own field, pushed by anything: POST /api/field?build=1
+#  | build | ge | 1 | 0 | 5000 | PlayDance | nod

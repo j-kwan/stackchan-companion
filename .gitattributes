@@ -1,0 +1,28 @@
+# Line-ending rules.
+#
+# `core.autocrlf` is true on this machine, so by default Git rewrites LF to
+# CRLF on checkout. That is harmless for source files and FATAL for anything
+# read by offset.
+
+# Runway database (tools/make-runways.py, from OurAirports).
+# FIXED-WIDTH file, 17 bytes per record, that the flight-radar guest
+# BINARY-SEARCHES by seeking to record * 17. A CRLF conversion would make
+# every record 18 bytes: every seek would land mid-record and the lookup would
+# return a neighbouring aerodrome, or nothing — silently, and only after a
+# fresh clone on Windows, never on the machine that generated the file.
+# The generator already writes it in binary mode for the same reason.
+sdcard/stackchan-companion/runways.csv -text
+
+# Fonts and firmware images: never touch their bytes.
+*.vlw  -text
+*.bin  -text
+
+# Shell scripts: LF, ALWAYS, whatever the checkout platform.
+#
+# `core.autocrlf` is true here, so without this line a Linux clone gets
+# `#!/usr/bin/env bash\r` and the kernel refuses it with "bad interpreter: no
+# such file or directory" — a message that names the interpreter, not the
+# carriage return, so it reads as a missing bash. These files exist precisely
+# so a Linux user has something that runs; shipping them unrunnable would be
+# worse than not shipping them.
+*.sh text eol=lf

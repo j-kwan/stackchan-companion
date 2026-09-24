@@ -1,0 +1,71 @@
+# =============================================================================
+# /stackchan-companion/config.yaml — StackChan-Eyes (exemple, valeurs par défaut)
+# Schéma complet : docs/reference/CONFIG.md. Tout est optionnel — une clé absente
+# retombe sur le défaut compilé (Tuning.h / modules).
+# ATTENTION : le firmware régénère ce fichier à chaque sauvegarde API —
+# seules les sections wifi: et tuning: sont relues, les commentaires perdus.
+# =============================================================================
+
+# Langue de TOUTE l'interface : console embarquee, API, bins invites et
+# launcher. "en" ou "fr". ABSENTE = ANGLAIS, deliberement : une carte ecrite
+# avant l'existence de cette cle doit se comporter comme une version anglaise,
+# pas comme une version cassee.
+# Source UNIQUE : les bins invites lisent cette cle-ci, ils n'en ont pas une a
+# eux — deux reglages de langue qui peuvent diverger n'en font pas un.
+lang: en
+
+wifi:
+  client_ssid: ""              # vide = AP direct (StackChan-AP / goodlife)
+  client_password: ""
+  ap_ssid: StackChan-AP
+  ap_password: goodlife
+  hostname: stackchan          # mDNS -> http://stackchan.local/
+
+api:
+  username: admin              # Basic Auth (console + /api/*)
+  password: ""                 # vide = API ouverte (defaut) ; modifiable a
+                                # chaud (console "Securite API" ou
+                                # POST /api/security), persiste ici
+
+tuning:
+  eye_color_dim: 0.80          # assombrissement palette (0-1)
+  eye_spacing: 14              # écart bord-à-bord des yeux en px
+                                # (0 = les bords se touchent, max 44)
+  eye_depth_scale: 0           # effet profondeur near/far (0 = décalage pur)
+  blink_lag_ms: 30             # retard œil droit (0-150)
+  crt_glow_dim: 0.28           # intensité halo CRT
+  crt_glow_px: 3               # dilatation halo (px)
+  saccade_ms: 80               # durée saccade (60-120)
+  fixation_min_ms: 800
+  fixation_max_ms: 4000
+  blink_median_ms: 3500        # médiane log-normale autoblink
+  head_follow: 1               # 1 = la tête suit les fixations
+  headfollow_hold_ms: 1000
+  servo_idle_release_ms: 4000 # couple relâché après X ms sans mouvement
+                                # (0 = jamais)
+  leds: 0                      # 1 = emphase LED émotionnelle
+  leds_brightness: 38          # 0-255 (~15 %)
+  sound: 0                     # 1 = chirps
+  sound_volume: 96             # 0-255
+  vor_gain: 0.90               # contre-rotation VOR (0-1.2)
+  vor_drift_alpha: 0.02        # correction complémentaire accel
+  saccade_recentre: 0.75       # |offset|/max déclenchant le rattrapage
+  shake_gyro_thr: 35           # °/s soutenus -> Scared
+  gyro_yaw_axis: 1             # mapping gyro -> écran (0=x 1=y 2=z)
+  gyro_yaw_sign: 1
+  gyro_pitch_axis: 0
+  gyro_pitch_sign: 1
+  pickup_dev_g: 0.08           # écart |a|-1g soutenu -> soulevé
+  pickup_hold_ms: 120
+  camera: 0                    # 1 = endpoints camera GC0308 (/api/camera/*)
+                                # pour Home Assistant / Frigate (init a la
+                                # demande, eteinte au repos)
+  cam_fps: 10                  # plafond images/s (1-15)
+  cam_quality: 12              # qualite JPEG (1-63, bas = mieux)
+  cam_brightness: 1            # exposition/cible AEC (-2..+2)
+  cam_contrast: 0              # contraste (-2..+2, 0=calibration)
+  cam_saturation: 1            # saturation (-2..+2)
+  cam_lowlight: 0              # 1 = basse lumiere (gain/expo AEC deplafonnes)
+  cam_vflip: 0                 # miroir vertical (0/1)
+  cam_hmirror: 0               # miroir horizontal (0/1)
+  telemetry: 0                 # 1 = flux série serial-plotter (calibration)

@@ -1,0 +1,11 @@
+# /dances/haro_roll.csv — roulement simulé (yaw + pitch combinés)
+# yaw,pitch,servoMs,holdMs,emotion,lid,gazeY
+0,0,200,300,Excited,0,0
+30,-5,400,600,,0,0.3
+0,0,400,600,,0,-0.3
+-30,-5,400,600,,0,0.3
+0,0,400,600,,0,-0.3
+20,-3,300,500,,0,0.2
+-20,-3,300,500,,winkG,0.2
+0,0,300,500,,blink,0
+0,0,300,400,Normal,0,0

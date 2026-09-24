@@ -1,0 +1,31 @@
+# ha-remote.yaml - telecommande Home Assistant (docs/guests/HA-REMOTE.md)
+# Bin invite : le robot PILOTE Home Assistant (ne pas confondre avec
+# docs/integrations/HOMEASSISTANT.md, ou c'est HA qui pilote le robot).
+host: 192.168.1.10   # IP ou nom d'hote de Home Assistant
+port: 8123
+# 1 = https (certificat NON verifie : usage LAN). ATTENTION : chaque requete
+# refait une poignee de main TLS, couteuse en heap interne - le suivi d'etat
+# est donc volontairement RALENTI en ssl:1 (1,2 s au lieu de 400 ms).
+ssl: 0
+# Jeton d'acces LONGUE DUREE : profil HA -> bas de page -> "Jetons d'acces
+# de longue duree" -> Creer. QUOTE : il contient des points et des tirets.
+token: ""
+# Re-DECOUVERTE automatique de la liste d'entites, en secondes.
+# 0 = JAMAIS : la liste est lue au demarrage et par le bouton
+# ACTUALISER du panneau de reglages (glisser droite depuis
+# l'accueil). L'ETAT de l'entite affichee, lui, est suivi en
+# permanence et n'a rien a voir avec ce reglage. Plage 0..3600.
+poll_s: 0
+brightness: 100      # retroeclairage ecran (10..255)
+# Suivre la lumiere ambiante (LTR-553). A 0 ici, alors que flight-radar et
+# space le mettent a 1 : c'est nouveau sur ce bin, et une telecommande qui
+# baisse toute seule apres une mise a jour surprend plus qu'elle ne sert.
+# Bouger le curseur de luminosite le remet a 0 : c'est reprendre la main.
+auto_bright: 0
+# Entites GARDEES EN PREMIER quand Home Assistant en sert plus que les 64 que
+# tient la table. Separees par des virgules, comparees en PREFIXE : "cover."
+# epingle tout le domaine, "cover.salon" epingle aussi "cover.salon_2". La
+# casse est ignoree. L'entite affichee a l'ecran est epinglee d'office.
+# Sans cette cle, le tri reste : repondantes d'abord, puis parts egales entre
+# les quatre categories (docs/guests/HA-REMOTE.md).
+entities: ""

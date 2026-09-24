@@ -1,0 +1,205 @@
+<!doctype html>
+<!-- `lang` is rewritten by i18n.js when the interface switches. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Choreographies — StackChan</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- BILINGUAL INTERFACE. The static text below is ENGLISH, the canonical
+     language: the page stays readable even if i18n.js fails to load. French is
+     applied on top at runtime, keyed by the `data-i18n*` attributes:
+       data-i18n       -> textContent
+       data-i18n-html  -> innerHTML (text carrying <b>/<code>)
+       data-i18n-title -> the `title` attribute (tooltips)
+     Strings built by JavaScript go through `t()` — see i18n.js. -->
+<header>
+  <h1 data-i18n-html="h1_html">Choreographies <b>StackChan</b></h1>
+  <div class="sp"></div>
+  <!-- The button shows the language it SWITCHES TO, not the current one: a
+       button labelled with the state you are already in reads as broken. -->
+  <button id="lang" class="ghost" data-i18n-title="lang_t"
+          title="Switch the interface to French">FR</button>
+  <button id="import" class="ghost" data-i18n="import" data-i18n-title="import_t"
+          title="Load a dance from a CSV file — replaces the current sequence">Import CSV…</button>
+  <input id="file" type="file" accept=".csv,text/csv" hidden>
+  <button id="download" class="primary" data-i18n="download" data-i18n-title="download_t"
+          title="Save the sequence as .csv, to drop into /dances/ on the SD card">Download CSV</button>
+</header>
+
+<main>
+
+  <!-- ─────────────── timeline ─────────────── -->
+  <section id="tl">
+    <!-- Two levels of command, two places. Whatever acts on ONE keyframe
+         (duplicate, delete, move) lives on the row itself; whatever acts on
+         the SEQUENCE (append, play) is pinned to the right of the heading.
+         They all share ONE scale (height, body, border) defined on #tl —
+         see style.css. -->
+    <h2 class="h2row"><span data-i18n="tl_h">Timeline</span>
+      <span class="h2acts">
+        <button id="add" data-i18n-title="add_t"
+                title="Append a keyframe at the end of the sequence">+</button>
+        <button id="play" class="primary" data-i18n-title="play_t"
+                title="Play the sequence at real durations — dragging the head interrupts it">▶ Play</button>
+      </span>
+    </h2>
+    <ul id="frames"></ul>
+    <!-- Panel footer: what describes the WHOLE sequence (progress, count) and
+         the action that replaces it. Pinned to the bottom, it no longer floats
+         just under a short list. -->
+    <div class="tl-foot">
+      <div class="bar"><i id="progress"></i></div>
+      <p class="hint" id="total"></p>
+      <button id="newSeq" class="ghost wide" data-i18n="newSeq" data-i18n-title="newSeq_t"
+              title="Start from an empty sequence — the current one is LOST">New sequence</button>
+    </div>
+  </section>
+
+  <!-- ─────────────── editor ─────────────── -->
+  <section>
+    <h2><span data-i18n="kf_h">Keyframe</span> <span id="kfNum"></span></h2>
+
+    <div class="field">
+      <label><span data-i18n="f_expr">Expression</span> <span class="v" id="vEm"></span></label>
+      <select id="emotion"></select>
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="f_yaw">Yaw — head</span> <span class="v" id="vYaw"></span></label>
+      <input id="yaw" type="range" min="-130" max="130" step="1">
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="f_pitch">Pitch — head</span> <span class="v" id="vPitch"></span></label>
+      <input id="pitch" type="range" min="-74" max="6" step="1">
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="f_gaze">Vertical gaze</span> <span class="v" id="vGaze"></span></label>
+      <input id="gazeY" type="range" min="-1" max="1" step="0.05">
+    </div>
+
+    <div class="field">
+      <label data-i18n="f_lids">Eyelids</label>
+      <!-- The option LABELS are translated by drawLids(); the VALUES are the
+           CSV's own vocabulary and never change. -->
+      <select id="lid"></select>
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="f_servo">Servo travel time</span> <span class="v" id="vServo"></span></label>
+      <input id="servoMs" type="range" min="0" max="1200" step="10">
+    </div>
+
+    <div class="field">
+      <label><span data-i18n="f_hold">Total keyframe duration</span> <span class="v" id="vHold"></span></label>
+      <input id="holdMs" type="range" min="0" max="3000" step="10">
+    </div>
+
+    <!-- LIVE CAPTURE. The robot is a better input device than two sliders:
+         released, its head is posable by hand and it reports the angles it has
+         been put into. -->
+    <div class="live">
+      <label class="livehead"><span data-i18n="lv_h">Capture from the robot</span>
+        <input type="checkbox" id="lvOn"><span class="lvsw"></span></label>
+      <div class="field">
+        <input id="lvIp" type="text" placeholder="192.168.1.50" spellcheck="false">
+        <span class="v" id="lvPose">—</span>
+      </div>
+      <div class="field">
+        <button id="lvGrab" data-i18n="lv_grab" disabled>⤓ Capture into the keyframe</button>
+        <label class="lvfollow"><input type="checkbox" id="lvFollow" disabled>
+          <span data-i18n="lv_follow">follow live</span></label>
+      </div>
+      <p class="hint" id="lvMsg" data-i18n="lv_idle">Off. Turning it on RELEASES the servos: the head goes limp and you place it by hand.</p>
+    </div>
+
+    <p class="warn" id="warn" hidden></p>
+    <p class="hint" data-i18n-html="rhythm_html">
+      Timing references: snappy move 80-150 ms · normal gesture 250-400 ms ·
+      slow slide 500-700 ms · expressive hold ≥ 600 ms beyond the travel.
+    </p>
+  </section>
+
+  <!-- ─────────────── preview ─────────────── -->
+  <section>
+    <h2 data-i18n="prev_h">Preview</h2>
+    <div class="stage">
+      <!-- The head is a CUBE, and that is faithful: the CoreS3 enclosure is
+           54×54 mm across the front. The 320×240 screen does not fill that
+           face, it is RECESSED into it in 4:3 with shell all around — hence
+           the visible plastic bezel. The five faces that are not the screen
+           are opaque and shaded like an object lit from above. Turning the
+           head turns the eyes with it. -->
+      <div class="scene" id="scene" data-i18n-title="scene_t"
+           title="Drag to orient the head">
+        <div class="head" id="head">
+          <div class="face front">
+            <div class="screen">
+              <canvas id="eyes" width="320" height="160"></canvas>
+              <div class="band" id="band"></div>
+            </div>
+          </div>
+          <div class="face back"></div>
+          <div class="face right"></div>
+          <div class="face left"></div>
+          <div class="face top"></div>
+          <div class="face bottom"></div>
+        </div>
+      </div>
+      <div class="readout">
+        <span><span data-i18n="r_yaw">yaw</span> <b id="rYaw">0</b>°
+              <i class="stop" id="sYaw" data-i18n="endstop" hidden>end stop</i></span>
+        <span><span data-i18n="r_pitch">pitch</span> <b id="rPitch">0</b>°
+              <i class="stop" id="sPitch" data-i18n="endstop" hidden>end stop</i></span>
+        <span><span data-i18n="r_gaze">gaze</span> <b id="rGaze">0</b></span>
+      </div>
+      <p class="hint drag" data-i18n-html="drag_html">
+        <b>Drag on the head</b> to set the servos: horizontally the <b>yaw</b>,
+        vertically the <b>pitch</b>. The sliders and the CSV follow. Travel
+        downwards is short — <code>pitch</code> only goes to <b>+6°</b> — and
+        “end stop” lights up as soon as you reach it: that is the real servo’s
+        limit, not the tool’s.
+      </p>
+    </div>
+    <p class="hint" data-i18n-html="fidelity_html">
+      The eyes replay the firmware’s chain: preset <b>per eye</b> (12 emotions
+      are asymmetric), the flips of <code>EyeRig::mirrored</code>, the
+      invariants of <code>normalize</code>, <code>EyeDrawer</code> tracing
+      corner radius by corner radius, and the <b>real color</b> of the
+      expression (<code>emotionToRgb</code>, dimmed by
+      <code>eye_color_dim</code>). The special renders are in there too: the
+      star of <code>Excited</code>, the cross of <code>Dead</code>, the
+      blushing cheeks, the sparkles and the sweat drop. The data is extracted
+      from the sources, nothing is copied by hand.<br>
+      What is <b>not</b> reproduced: idle animations (breathing, saccades,
+      micro-overshoot), VOR, dynamic preset variants (Sad turning into Scary
+      when looking up) and the CRT effect. The band below the eyes is only a
+      framing reference: a reminder that the screen is 240 px tall and the eyes
+      take up just 160 of them. The tool shows the <b>pose</b> of a keyframe,
+      not the life of the robot around it.
+    </p>
+  </section>
+
+  <!-- ─────────────── CSV ─────────────── -->
+  <section style="grid-column:1/-1">
+    <h2 data-i18n-html="csv_h_html">CSV — <code>/dances/&lt;name&gt;.csv</code> on the SD card</h2>
+    <textarea id="csv" spellcheck="false"></textarea>
+    <p class="hint" data-i18n-html="csv_hint_html">
+      Editable directly: the timeline updates on every valid keystroke. The file
+      name gives the dance its name. Columns:
+      <code>yaw,pitch,servoMs,holdMs,emotion,lid,gazeY</code>.
+    </p>
+  </section>
+
+</main>
+
+<script src="i18n.js"></script>
+<script src="presets.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

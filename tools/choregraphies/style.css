@@ -1,0 +1,412 @@
+/* Éditeur de chorégraphies — StackChan
+   Thème repris de la console embarquée (src/app/WebConsole.h) : mêmes
+   variables, mêmes rayons, même fond « aurora ». Un outil qui ne ressemble
+   pas au robot donne l'impression de piloter autre chose. */
+:root{
+  --txt:#e8eefb; --mut:#93a1bd; --dim:#6b7a99;
+  --acc:#22d3ee; --acc2:#818cf8; --ok:#34d399; --ko:#f87171;
+  --glass:rgba(255,255,255,.055); --glass2:rgba(255,255,255,.09);
+  --bord:rgba(255,255,255,.12); --bord2:rgba(255,255,255,.2);
+  --sunk:rgba(8,12,22,.55);
+  --r:6px; --rc:3px;
+  --acc-grad:linear-gradient(120deg,var(--acc),var(--acc2));
+}
+*{box-sizing:border-box}
+html{scrollbar-color:rgba(255,255,255,.18) transparent}
+/* Colonne flex : `main` peut alors réclamer la hauteur restante après
+   l'en-tête, ce dont la zone CSV a besoin pour prendre « le reste ». */
+body{
+  font-family:-apple-system,system-ui,'Segoe UI',sans-serif;
+  margin:0; color:var(--txt); min-height:100vh; background:#0a0d16;
+  display:flex; flex-direction:column;
+}
+/* fond fixe : le flou des panneaux a de la matière à diffuser */
+body::before{
+  content:""; position:fixed; inset:0; z-index:-1; background:
+    radial-gradient(600px 420px at 12% -5%,rgba(34,211,238,.16),transparent 60%),
+    radial-gradient(720px 500px at 95% 12%,rgba(129,140,248,.17),transparent 65%),
+    radial-gradient(560px 560px at 55% 115%,rgba(52,211,153,.10),transparent 60%),
+    linear-gradient(165deg,#0b0f1c 0%,#0d1322 55%,#0a0e1a 100%);
+}
+
+header{
+  position:sticky; top:0; z-index:9; padding:12px 20px;
+  display:flex; align-items:center; gap:16px; flex-wrap:wrap;
+  background:rgba(10,13,22,.72); backdrop-filter:blur(22px);
+  border-bottom:1px solid var(--bord);
+}
+h1{margin:0; font-size:1.05rem; font-weight:600; letter-spacing:.2px}
+h1 b{background:var(--acc-grad); -webkit-background-clip:text;
+     background-clip:text; color:transparent}
+header .sp{flex:1}
+
+/* Trois colonnes de HAUTEUR ÉGALE. C'est le défaut de la grille
+   (`align-items:stretch`) : le `start` qui était posé ici est précisément
+   ce qui laissait chaque section retomber à sa hauteur naturelle, d'où
+   trois panneaux inégaux. Pas besoin de flex pour l'égalisation — flex
+   sert en revanche À L'INTÉRIEUR des sections, pour que le contenu
+   occupe la hauteur ainsi gagnée au lieu d'y laisser un trou. */
+/* La hauteur se règle sur la LIGNE de grille, jamais sur la liste des
+   keyframes : plafonner la liste la laissait remplir sa section, mais une
+   danse de 23 keyframes gonflait quand même la ligne et étirait les deux
+   autres colonnes. La section reçoit donc une hauteur, et c'est la liste qui
+   défile à l'intérieur. */
+main{
+  display:grid; gap:14px; padding:14px 20px 28px;
+  /* Timeline · Keyframe · Aperçu — l'ordre du travail, de gauche à droite :
+     on choisit une keyframe, on la règle, on regarde le résultat. La
+     timeline et l'éditeur sont ADJACENTS parce qu'on fait l'aller-retour
+     entre les deux ; l'aperçu, qu'on ne fait que consulter, prend la
+     colonne large au bout. L'ordre du DOM suit l'ordre visuel — rien n'est
+     réordonné par la grille, ce qui garde la navigation au clavier et la
+     lecture du source cohérentes avec l'écran. */
+  grid-template-columns:260px 300px minmax(340px,1fr);
+  /* Hauteur de la ligne du haut = celle du PLUS GRAND de Keyframe et Aperçu,
+     c'est-à-dire leur contenu réel. Elle était plafonnée à `72vh`, une valeur
+     arbitraire qui ne correspondait à rien : trop haute sur un grand écran
+     (du vide sous les réglages), trop basse sur un petit (les notes
+     comprimées). La timeline, elle, ne PARTICIPE PAS à ce calcul — sa liste
+     a une base flex nulle (voir #frames) : elle s'adapte à la hauteur trouvée
+     et défile, au lieu de l'imposer avec ses dix-sept keyframes.
+     La zone CSV prend tout le reste (`1fr`, plancher à 0 pour qu'une ligne
+     du haut plus grande que l'écran la laisse se réduire au lieu de
+     déborder). */
+  grid-template-rows:auto minmax(0, 1fr);
+  flex:1 1 auto; min-height:0;
+}
+@media (max-width:1100px){ main{grid-template-columns:1fr} }
+
+/* Chaque section est une colonne flex : son dernier bloc utile peut alors
+   absorber la hauteur excédentaire (voir #frames et .stage). */
+section{
+  background:var(--glass); backdrop-filter:blur(18px);
+  border:1px solid var(--bord); border-radius:var(--r); padding:14px;
+  display:flex; flex-direction:column; min-width:0;
+  overflow:auto;                /* filet : sur un écran peu haut, une section
+                                   peut être plus courte que son contenu — il
+                                   défile alors au lieu d'être coupé en
+                                   silence */
+}
+/* Les notes explicatives ne se laissent PAS écraser. Ce sont des éléments
+   flex, donc rétrécissables par défaut : une ligne trop courte les comprimait
+   sous leur hauteur de texte et la fin de la note disparaissait sans le
+   moindre signe. Ce qui doit céder, c'est la scène (règle plus bas). */
+section > .hint, section > .warn{flex-shrink:0}
+section > h2{
+  margin:0 0 10px; font-size:.72rem; font-weight:600; letter-spacing:.14em;
+  text-transform:uppercase; color:var(--mut);
+}
+
+button, select, input[type=text], input[type=number], input[type=file]::file-selector-button{
+  background:var(--sunk); color:var(--txt); border:1px solid var(--bord);
+  border-radius:var(--rc); padding:7px 10px; font:inherit; font-size:.85rem;
+}
+button{cursor:pointer; transition:border-color .15s, background .15s}
+button:hover{border-color:var(--bord2); background:var(--glass2)}
+button.primary{background:var(--acc-grad); color:#06121f; border:0; font-weight:600}
+button.primary:hover{filter:brightness(1.08)}
+button.ghost{background:transparent}
+button:disabled{opacity:.4; cursor:default}
+
+/* ---- timeline ----------------------------------------------------------
+   ÉCHELLE UNIQUE du panneau. Il portait quatre traitements de bouton pour
+   quatre rôles — « Lire » en dégradé 28 px, « + Keyframe » pleine largeur
+   30 px, les actions de ligne à 19 px, « Nouvelle séquence » en ghost 30 px,
+   trois corps de texte différents et quatre rythmes verticaux. Tout est
+   maintenant dérivé de ces trois variables ; ce qui reste distinct l'est
+   PAR INTENTION, et une seule fois :
+     · dégradé      → « Lire », l'action principale du panneau ;
+     · trait tireté → « + Keyframe », qui va créer quelque chose ;
+     · rouge survol → « ✕ », la seule action destructrice d'une ligne.      */
+#tl{
+  --tl-h:26px;        /* hauteur de TOUTE commande du panneau */
+  --tl-fs:.78rem;     /* corps de TOUT libellé de commande */
+  --tl-gap:6px;       /* respiration verticale, partout la même */
+}
+#tl button{
+  height:var(--tl-h); padding:0 10px; font-size:var(--tl-fs);
+  display:inline-flex; align-items:center; justify-content:center;
+}
+#tl button.wide{width:100%}
+
+/* Titre porteur d'une commande : « Lire » agit sur la séquence entière,
+   il est donc plaqué à droite du titre de la section, pas dans la liste. */
+/* Tout ce qui est sur cette ligne — le mot « Timeline », le « + » et
+   « ▶ Lire » — est centré sur le MÊME axe horizontal. Trois corps de texte
+   différents s'y côtoient (0,72 rem en capitales espacées pour le titre,
+   1 rem pour le signe, 0,78 rem pour le libellé) : sans centrage explicite
+   à chaque niveau, chacun retombe sur sa propre ligne de base et le titre
+   flotte au-dessus des boutons. */
+h2.h2row{
+  display:flex; align-items:center; justify-content:space-between; gap:10px;
+  margin-bottom:var(--tl-gap); line-height:1;
+}
+h2.h2row button{text-transform:none; letter-spacing:0; line-height:1}
+/* Commandes de SÉQUENCE, groupées à droite du titre. « + » est carré :
+   réduit au signe, il n'a plus de libellé à porter — son infobulle dit ce
+   qu'il fait. */
+.h2acts{display:flex; align-items:center; gap:5px}
+/* Le glyphe est centré par la boîte flex du bouton (voir `#tl button`),
+   pas par sa hauteur de ligne : « + » et « ▶ » n'ont pas le même dessin
+   ni la même chasse verticale, s'en remettre au texte les décalerait. */
+#tl .h2acts #add{width:var(--tl-h); padding:0; font-size:1rem}
+
+/* La liste prend TOUTE la hauteur disponible et défile si elle déborde.
+   `flex:1` la fait grandir jusqu'au pied de panneau ; `min-height:0`
+   l'autorise à passer sous sa taille naturelle — sans quoi un élément flex
+   refuse de rétrécir et pousserait le pied hors de la section. Aucun
+   `max-height` ici : la borne est sur la LIGNE de grille (voir `main`),
+   ce qui laisse la liste occuper tout ce que la section lui offre. */
+/* Base flex NULLE (`flex:1 1 0`) et non `auto` : c'est ce qui empêche la
+   liste de dicter la hauteur de la ligne de grille. Avec `auto`, ses dix-sept
+   keyframes comptaient dans la hauteur du panneau, donc dans celle de la
+   ligne, et la timeline étirait Keyframe et Aperçu avec elle. À zéro, elle ne
+   demande rien puis s'étend (`flex-grow`) dans la hauteur fixée par les deux
+   autres — et défile au-delà. */
+#frames{
+  list-style:none; margin:0; padding:0;
+  flex:1 1 0; min-height:0; overflow-y:auto; overflow-x:hidden;
+}
+
+/* Chaque keyframe est une CARTE encadrée : on voit où elle commence et où
+   elle finit, ce qu'un simple fond au survol ne disait pas.
+   Grille à trois colonnes et deux lignes :
+       ┌────────────────────────┐
+       │ 1   Happy       ⧉  ✕   │   numéro et expression sur la 1re ligne
+       │     300 ms      ↑  ↓   │   durée dans la COLONNE de l'expression
+       └────────────────────────┘   actions à cheval sur les deux
+   La durée se cale ainsi sur le nom du preset, pas sous le numéro : la
+   colonne de texte a un seul bord gauche, et l'œil n'a qu'un alignement à
+   suivre en parcourant la liste. */
+#frames li{
+  display:grid;
+  grid-template-columns:auto 1fr auto;
+  grid-template-rows:auto auto;
+  column-gap:7px;
+  padding:6px 7px 6px 3px;      /* gauche minimale : le numéro tient dans
+                                   sa propre colonne, rien ne l'indente */
+  margin-bottom:var(--tl-gap);
+  border:1px solid var(--bord); border-radius:var(--rc);
+  cursor:pointer; font-size:var(--tl-fs);
+}
+#frames li:hover{background:var(--glass); border-color:var(--bord2)}
+#frames li.sel{background:var(--glass2); border-color:var(--acc)}
+
+/* Numéro et expression partagent la première ligne, alignés sur leur
+   BASE — pas centrés : les deux corps de texte diffèrent, et un centrage
+   ferait flotter le chiffre au-dessus du nom. */
+#frames li .n{
+  grid-column:1; grid-row:1; align-self:baseline;
+  min-width:14px; text-align:right; font-size:.72rem; color:var(--dim);
+  font-variant-numeric:tabular-nums;
+}
+#frames li.sel .n{color:var(--acc)}
+#frames li .em{
+  grid-column:2; grid-row:1; align-self:baseline;
+  color:var(--txt); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+#frames li .ms{
+  grid-column:2; grid-row:2;          /* MÊME colonne que l'expression */
+  color:var(--mut); font-variant-numeric:tabular-nums; font-size:.72rem;
+}
+
+/* Actions en grille 2×2, à cheval sur les deux lignes de texte : en haut
+   ce qui change le NOMBRE de keyframes, en bas ce qui change leur ORDRE.
+   Leur hauteur ne se cale PAS sur `--tl-h` — deux rangées y feraient 54 px,
+   soit plus haut que la carte. Elle se cale sur les deux lignes de texte
+   qu'elles longent : 2 × 16 px + 2 px d'écart = 34 px, la hauteur du bloc
+   « expression + durée ». Largeur = `--tl-h`, ce qui les rend carrées et
+   les raccroche à l'échelle du panneau. */
+#frames li .acts{
+  grid-column:3; grid-row:1 / span 2; align-self:center;
+  display:grid; grid-template-columns:repeat(2, var(--tl-h)); gap:2px;
+}
+#frames li .acts button{
+  height:16px; padding:0; line-height:1;
+  color:var(--mut); background:transparent;
+}
+#frames li .acts button:hover:not(:disabled){
+  color:var(--txt); background:var(--glass2); border-color:var(--bord2);
+}
+#frames li .acts button.danger:hover:not(:disabled){
+  color:var(--ko); border-color:rgba(248,113,113,.5);
+}
+
+/* Pied de panneau PLAQUÉ EN BAS. `margin-top:auto` absorbe l'espace libre
+   restant : la liste au-dessus prend d'abord ce qu'elle peut (`flex:1`),
+   et quand son `max-height` la fige, c'est cette marge qui récupère le
+   reste et repousse le pied contre le bord inférieur de la section. */
+#tl .tl-foot{
+  margin-top:auto; padding-top:var(--tl-gap);
+  display:flex; flex-direction:column; gap:var(--tl-gap);
+}
+#tl .tl-foot .hint{margin:0}
+
+/* ---- éditeur de keyframe ---- */
+.field{margin-bottom:12px}
+.field label{
+  display:flex; justify-content:space-between; align-items:baseline;
+  font-size:.76rem; color:var(--mut); margin-bottom:4px;
+}
+.field label .v{color:var(--acc); font-variant-numeric:tabular-nums}
+.field input[type=range]{width:100%; accent-color:#22d3ee}
+.field select, .field input[type=number]{width:100%}
+.hint{font-size:.72rem; color:var(--dim); line-height:1.45; margin:6px 0 0}
+.warn{font-size:.74rem; color:#fbbf24; line-height:1.45; margin:8px 0 0}
+
+/* ---- aperçu : la TÊTE ----
+   Un vrai CUBE, et c'est le modèle fidèle : le boîtier CoreS3 fait
+   54×54 mm de face pour 16,5 mm d'épaisseur, et la tête StackChan qui
+   l'accueille est cubique. L'écran 2" 320×240 n'occupe PAS toute la face —
+   sa zone active mesure environ 40,8×30,6 mm, soit ~76 % × 57 % du carré.
+   D'où un écran encastré, entouré de coque : c'est ce que l'on voit sur le
+   robot, et l'ancien modèle « boîte à la taille de l'écran » l'ignorait. */
+:root{
+  --hs:210px;                    /* arête du cube */
+  --sw:76%;  --sh:57%;           /* zone active de la dalle, en % de la face */
+  /* Coque plastique, nuancée comme un objet éclairé d'en haut. Ce ne sont
+     pas des teintes décoratives : c'est ce dégradé qui fait lire un volume
+     plutôt que des rectangles empilés. */
+  --pl-top:#d5dae2; --pl-left:#a2a8b3;
+  --pl-right:#8f96a1; --pl-back:#7c838e; --pl-bottom:#6a707b;
+  /* La FAÇADE, elle, est NOIRE : sur le CoreS3 la vitre couvre toute la
+     face avant, la coque claire ne se voit que sur les côtés et les
+     arêtes. */
+  --pl-face:#0a0a0c;
+  /* Fond de dalle : gris très sombre, jamais un noir pur. Une LCD éteinte
+     renvoie toujours un peu de lumière — c'est ce qui la fait lire comme
+     une surface physique plutôt qu'un trou dans l'image.
+     SOURCE UNIQUE de cette couleur : ni le canvas ni le bandeau de statut
+     ne peignent de fond — le canvas s'efface (voir drawEyes dans app.js),
+     le bandeau reste transparent, et tous deux laissent celui-ci
+     transparaître. La dalle est donc d'un seul tenant. */
+  --screen-bg:#0d0e11;
+}
+
+/* La scène absorbe elle aussi la hauteur gagnée, et s'y centre : la tête
+   reste au milieu de son panneau au lieu de se coller sous le titre. */
+.stage{
+  display:flex; flex-direction:column; align-items:center; gap:14px;
+  flex:1 1 auto; min-height:0; justify-content:center;
+}
+.stage > .hint{flex-shrink:0}
+
+/* La scène est la SEULE chose qui cède quand la place manque : elle peut
+   descendre à 210 px sans qu'on perde rien d'utile — la tête est juste vue
+   d'un peu plus loin — alors qu'un texte comprimé, lui, devient illisible. */
+.scene{
+  perspective:900px; width:100%; max-width:420px;
+  flex:0 1 auto; height:300px; min-height:210px;
+  display:grid; place-items:center;
+  cursor:grab; touch-action:none;      /* le glissé pilote les servos :
+                                          le navigateur ne doit pas le
+                                          confisquer pour défiler */
+  user-select:none;
+}
+.scene.dragging{cursor:grabbing}
+
+.head{
+  position:relative; width:var(--hs); height:var(--hs);
+  transform-style:preserve-3d; transition:transform .06s linear;
+}
+/* Pendant le glissé, toute transition transforme le suivi du doigt en
+   caoutchouc : on la coupe, le retour doit être immédiat. */
+.scene.dragging .head{transition:none}
+
+/* Faces OPAQUES : la tête est un objet, pas un fil de fer. `backface-
+   visibility:hidden` retire les faces vues de l'intérieur, sans quoi
+   l'arrière transparaîtrait à travers l'avant. L'arête sombre donne au
+   volume ses plis. */
+.face{
+  position:absolute; width:var(--hs); height:var(--hs);
+  left:0; top:0;
+  border:1px solid rgba(0,0,0,.28);
+  backface-visibility:hidden;
+}
+.face.front {transform:translateZ(calc(var(--hs) / 2)); background:var(--pl-face);
+             display:grid; place-items:center}
+.face.back  {transform:rotateY(180deg) translateZ(calc(var(--hs) / 2));
+             background:var(--pl-back)}
+.face.right {transform:rotateY( 90deg) translateZ(calc(var(--hs) / 2));
+             background:var(--pl-right)}
+.face.left  {transform:rotateY(-90deg) translateZ(calc(var(--hs) / 2));
+             background:var(--pl-left)}
+.face.top   {transform:rotateX( 90deg) translateZ(calc(var(--hs) / 2));
+             background:var(--pl-top)}
+.face.bottom{transform:rotateX(-90deg) translateZ(calc(var(--hs) / 2));
+             background:var(--pl-bottom)}
+
+/* La DALLE, encastrée dans la façade noire. Un liseré très discret la
+   détache de la façade, qui est de la même famille de noirs. */
+.screen{
+  position:relative; width:var(--sw); height:var(--sh);
+  background:var(--screen-bg); overflow:hidden; border-radius:2px;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.05);
+}
+/* 320×160 d'yeux au-dessus, le reste en bandeau — les mêmes deux tiers /
+   un tiers que sur le vrai 320×240.
+   Le canvas est TRANSPARENT hors des yeux : son fond est celui de la
+   dalle, défini une seule fois en CSS.
+   PAS de `image-rendering:pixelated` ici : le buffer du canvas est
+   redimensionné en JS sur la taille AFFICHÉE (voir `eyeCtx`), il n'y a donc
+   plus rien à rééchantillonner. L'y remettre serait inoffensif tant que les
+   deux tailles coïncident, mais trompeur — c'est ce réglage, combiné à une
+   réduction de facteur non entier, qui rabotait un bras de la croix Dead. */
+#eyes{
+  display:block; width:100%; height:66.667%;
+  background:transparent;
+}
+/* Bandeau de statut : AUCUN fond propre. Sur le robot c'est la même dalle
+   qui continue, pas un second panneau — un aplat plus clair en faisait une
+   pièce rapportée. Seul un cheveu de séparation reste, parce qu'il marque
+   une frontière RÉELLE : les 160 px où s'arrête la zone des yeux
+   (units::EYEZONE_H), à quoi renvoie la note sous l'aperçu. */
+.band{
+  position:absolute; left:0; right:0; bottom:0; height:33.333%;
+  display:flex; align-items:center; justify-content:center;
+  font-size:.7rem; letter-spacing:.12em; text-transform:uppercase;
+  color:var(--mut); background:transparent;
+  border-top:1px solid rgba(255,255,255,.06);
+}
+
+.readout{
+  display:flex; gap:18px; font-size:.78rem; color:var(--mut);
+  font-variant-numeric:tabular-nums; flex-wrap:wrap; justify-content:center;
+}
+.readout b{color:var(--txt); font-weight:600}
+.readout .stop{
+  font-style:normal; font-size:.68rem; color:#fbbf24;
+  border:1px solid rgba(251,191,36,.45); border-radius:2px; padding:0 4px;
+}
+.hint.drag{margin:0; text-align:center; max-width:420px}
+
+/* ---- CSV ---- */
+/* Le champ absorbe la hauteur restante de sa section (elle-même sur la
+   deuxième ligne en `1fr`), avec 150 px de plancher : sur un grand écran on
+   voit la danse entière sans faire défiler. */
+#csv{
+  width:100%; flex:1 1 0; min-height:150px;
+  background:var(--sunk); color:var(--txt);
+  border:1px solid var(--bord); border-radius:var(--rc); padding:10px;
+  font:.78rem/1.5 ui-monospace,Menlo,Consolas,monospace; resize:vertical;
+  white-space:pre; overflow-x:auto;
+}
+.bar{height:4px; border-radius:2px; background:var(--sunk); overflow:hidden; width:100%}
+.bar > i{display:block; height:100%; background:var(--acc-grad); width:0}
+
+/* ── live capture ─────────────────────────────────────────────────────────
+   Set apart from the sliders above it on purpose: those edit a number, this
+   one takes it from the world. */
+.live { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--bord); }
+.livehead { display: flex; align-items: center; gap: 8px; font-weight: 600;
+            font-size: .82rem; text-transform: uppercase; letter-spacing: .06em;
+            color: var(--mut); cursor: pointer; margin-bottom: 8px; }
+.livehead input { margin-left: auto; }
+.live .field { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.live #lvIp { flex: 1; min-width: 0; }
+.live #lvPose { font-family: ui-monospace, monospace; white-space: nowrap; }
+.lvfollow { display: inline-flex; align-items: center; gap: 5px;
+            font-size: .8rem; color: var(--mut); cursor: pointer; }
+.live.on .livehead { color: var(--acc); }
+#lvMsg.ko { color: var(--ko); }
+#lvMsg.ok { color: var(--ok); }
