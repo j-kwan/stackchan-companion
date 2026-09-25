@@ -1,0 +1,108 @@
+# =========================================================================
+# MODE HARO - PHASE 1 (20 regles actives) - REVISION 2
+# =========================================================================
+# Relu contre le code. Corrections appliquees, chacune expliquee sur place.
+#
+# DEUX PIEGES QUI GOUVERNENT TOUT CE FICHIER :
+#
+#  (1) UN CHAMP ABSENT VAUT ZERO. RuleEngine::evalRule lit
+#      `_fields.getF(r.field, 0.0f)` : il n'y a AUCUN test d'existence. Donc
+#      toute regle `lt`/`le` avec un seuil > 0 sur un champ qui peut manquer
+#      est VRAIE tant que le champ n'existe pas. C'est ce qui faisait jouer
+#      la danse "happy" a chaque demarrage (ancienne regle `build le 0`).
+#      Regle d'ecriture : sur un champ optionnel, comparer a un CODE NON NUL
+#      avec `eq`, jamais a zero avec `le`.
+#
+#  (2) LE PLAFOND EST DUR ET SILENCIEUX. MAX_RULES = 24, dont 3 built-ins
+#      (dark_sleepy). La revision 1 en comptait 21 : 3 + 21 = 24, soit
+#      ZERO marge, et `RuleEngine::add` renvoie false SANS RIEN DIRE au-dela.
+#      Cette revision en compte 20 -> une place libre.
+# =========================================================================
+
+# --- BLOC 0 - INTERACTION CLAUDE ---
+# Gate `claude` : ne fire que si le bridge statusline est installe.
+# `ctx` est pousse par le PC (POST /api/field) : le gate protege du piege (1).
+claude | ctx | gt | 30 | 5000 | 60000 | SetEmotion | Curious | 15000
+claude | ctx | ge | 80 | 3000 | 60000 | SetEmotion | Worried | 15000
+claude | ctx | ge | 95 | 2000 | 30000 | SetEmotion | Scared | 15000
+
+# --- BLOC 1 - BATTERIE & CHARGE ---
+# ATTENTION : `batt` vaut -1 si le PMIC est inconnu, et -1 < 15 est VRAI.
+# Sur cette carte l'AXP2101 repond, donc c'est theorique - mais si ces deux
+# regles firent au demarrage sans raison, c'est la piste.
+| batt | lt | 15 | 0 | 60000 | SetEmotion | Worried | 15000
+| chg | ge | 1 | 1000 | 30000 | SetEmotion | Happy | 10000
+| batt | lt | 5 | 0 | 120000 | PlayDance | nod
+
+# --- BLOC 2 - LUMIERE ---
+# Le gate `dark_sleepy` n'est pas un gout, c'est une PROTECTION : main.cpp ne
+# publie ce champ que si `board.hasLtr553()`. Sans gate et sans capteur,
+# `light` est absent donc nul, et une regle `lt` fire en permanence (piege 1).
+#
+# LE SEUIL HAUT A ETE BAISSE DE 80 A 55, ET C'EST UNE MESURE, PAS UN AVIS.
+# light_pct = 100 * ln(v+1)/ln(4096). Pour depasser 80 il faut v > 775 counts.
+# Or l'etalonnage mesure du capteur, quasi aveugle derriere la coque K151, dit
+# "bureau eclaire ~50-100 counts" (firmware/common/Ltr553.h). L'ancien seuil
+# demandait donc 8 a 15 fois un bureau eclaire : la regle etait MORTE.
+# 55 % ~ 100 counts = un bureau franchement eclaire. Atteignable.
+dark_sleepy | light | gt | 55 | 2000 | 30000 | SetEmotion | Excited | 15000
+dark_sleepy | light | lt | 30 | 5000 | 60000 | SetEmotion | Curious | 15000
+# SUPPRIMEE : `light lt 10 -> Awe`. Seuil 10 % = v < 1,3 count, c'est-a-dire
+# la MEME obscurite qui declenche le mode nuit built-in (light <= 1). Les deux
+# se disputaient : Awe forcait 15 s par-dessus un robot qui entrait en
+# sommeil. Une place de gagnee.
+
+# --- BLOC 3 - SON & MICROS ---
+# Deux regles pour une seule idee (l'une ou l'autre oreille) : il n'existe pas
+# de champ "micMax". C'est le prix honnete de deux capteurs, pas un doublon.
+mic | micL | gt | 0.7 | 200 | 5000 | SetEmotion | Surprised | 5000
+mic | micR | gt | 0.7 | 200 | 5000 | SetEmotion | Surprised | 5000
+mic | micL | gt | 0.4 | 3000 | 30000 | SetEmotion | Curious | 8000
+
+# --- BLOC 4 - RESEAU ---
+# `rssi` est TOUJOURS publie (0 en AP ou deconnecte) : pas de piege (1) ici,
+# et `eq 0` est le bon test pour "je n'ai pas de reseau".
+# SUPPRIMEE : `rssi gt -50 -> Happy`. Un bon signal n'est pas un evenement :
+# la regle firait une fois au demarrage et ne redisait plus rien de la
+# session. A 24 places dont 3 prises, une regle doit payer son loyer.
+| rssi | lt | -80 | 5000 | 60000 | SetEmotion | Worried | 10000
+| rssi | eq | 0 | 10000 | 300000 | PlayDance | shakeNo
+
+# --- BLOC 5 - SCRIPTS PC ---
+# CORRIGE (piege 1). L'ancienne paire etait :
+#     | build | ge | 1 | ... | SetEmotion | Focused
+#     | build | le | 0 | ... | PlayDance  | happy      <-- FIRAIT A CHAQUE BOOT
+# Sans script PC, `build` n'existe pas, vaut 0, et `0 <= 0` est vrai : le robot
+# fetait une compilation qui n'avait jamais eu lieu, une fois par demarrage.
+# Convention explicite, tous codes NON NULS : 1 = en cours, 2 = succes,
+# 3 = echec. Champ absent = 0 = aucune regle ne correspond.
+#   POST /api/field?build=1   puis   ?build=2   ou   ?build=3
+| build | eq | 1 | 0 | 10000 | SetEmotion | Focused | 15000
+| build | eq | 2 | 0 | 10000 | PlayDance | happy
+| build | eq | 3 | 0 | 10000 | SetEmotion | Frustrated | 15000
+
+# --- BLOC 6 - TIMER & POMODORO ---
+# CORRIGE : l'ancienne paire lisait `tmr_st`, qui N'EST PAS un etat ordonne
+# mais un CODE COULEUR, et non monotone :
+#     Idle=0  Run=1  Paused=2  Ring=3  Work=1  Break=4  Hydrate=4  Done=4
+# Donc `tmr_st ge 3` attrapait Ring MAIS AUSSI chaque pause et chaque rappel
+# d'hydratation ; et `tmr_st ge 1` attrapait tout sauf Idle - y compris
+# Paused, Break et Done. "Focused" pendant une pause, c'est l'inverse du sens.
+# Le champ juste est `tmr_ph`, publie a cote precisement parce que `tmr_st`
+# confond des phases : c'est l'enum Phase brut.
+#     Idle=0 Run=1 Paused=2 Ring=3 Work=4 Break=5 Done=6 Hydrate=7
+# NOTE : tmr_ph/tmr_st ne sont publies QUE si band_mode vaut 4 ou 5. En mode
+# jauges (3), ces trois regles dorment - ce qui est correct, pas casse.
+| tmr_ph | eq | 3 | 0 | 20000 | SetEmotion | Excited | 10000
+| tmr_ph | eq | 4 | 5000 | 60000 | SetEmotion | Focused | 15000
+| tmr_ph | eq | 5 | 1000 | 60000 | SetEmotion | Happy | 10000
+
+# --- BLOC 7 - CAMERA ---
+| cam | ge | 1 | 2000 | 60000 | SetEmotion | Curious | 10000
+# SUPPRIMEE : `night ge 1 -> Sleepy`. Le champ `night` N'EST PAS le crepuscule
+# solaire (celui-la n'existe que dans /api/sensors) : c'est
+# `roulette().darkMode()`, l'etat pose par le built-in dark_sleepy. Or quand ce
+# mode est actif, la roulette met DEJA Sleepy a ~66 % des tirages et Normal a
+# zero. La regle ne faisait donc qu'epingler Sleepy 15 s par-dessus, en tuant
+# "l'emotion occasionnelle" que le mode nuit garde vivante exprès.
+# Une seconde place de gagnee.

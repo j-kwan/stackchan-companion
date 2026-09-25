@@ -1,0 +1,370 @@
+{
+  "info": {
+    "_postman_id": "b7c1d0e2-9a44-4f6e-8f21-5c3a2d1e0f77",
+    "name": "autorouter.aero — NOTAM (StackChan flight-radar)",
+    "description": "Exercises exactly the two calls `firmware/flight-radar/main.cpp` makes for its NOTAM view: the OAuth 2.0 token, then the NOTAM query. Written from the CODE, not from the vendor docs, so what you test here is what the robot does.\n\n## Credentials never live in this file\n\n`user` and `pass` are declared empty and typed `secret`. Fill them in Postman (collection variables, or better an environment) — this file is committed, and the account is your autorouter LOGIN, not a throwaway API key: it can file flight plans. Same rule as `sdcard/stackchan-companion/config.yaml`.\n\n## Tokens are the scarce resource, not the requests\n\nA token lives SEVEN DAYS and an account may hold only TWENTY active ones. Minting one per test run is a countdown to a 403 `toomanytokens` that then lasts a week. So the NOTAM requests REUSE `{{token}}` and mint only when it is empty — the same optimistic policy as the firmware and `tools/probes/autorouter-notam.py`. Run `01 Token` once; run it again only when a request comes back 401/403.\n\n## The 403 that is not what it looks like\n\nautorouter answers 403 for two unrelated things and the remedies are OPPOSITE:\n\n- `\"error\": \"privileges\"` — the account is fine but API access is a SEPARATE permission, granted on request through a support ticket.\n- `\"error\": \"toomanytokens\"` — nothing to ask anyone. The account is healthy and merely holds 20 live tokens. Wait for the oldest to expire, or revoke them.\n\nThe tests below read that field and say which one it is. Getting this wrong cost a week of waiting on a support ticket for a perfectly good account (2026-08-01).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "base",
+      "value": "https://api.autorouter.aero/v1.0",
+      "type": "string",
+      "description": "API root. The firmware hard-codes this same host."
+    },
+    {
+      "key": "user",
+      "value": "",
+      "type": "secret",
+      "description": "autorouter account e-mail. LEAVE EMPTY HERE — set it in an environment."
+    },
+    {
+      "key": "pass",
+      "value": "",
+      "type": "secret",
+      "description": "autorouter account password. LEAVE EMPTY HERE — set it in an environment."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "type": "secret",
+      "description": "Filled by '01 Token'. Reused by every NOTAM request; 20 active per account, 7 days each."
+    },
+    {
+      "key": "icao",
+      "value": "FMEE",
+      "type": "string",
+      "description": "Aerodrome. FMEE = Roland Garros, La Réunion — the radar's default station."
+    },
+    {
+      "key": "fir",
+      "value": "FMMM",
+      "type": "string",
+      "description": "Flight Information Region. Optional: the aerodrome list misses en-route NOTAMs (airspace, navaids) that only the FIR publishes."
+    },
+    {
+      "key": "limit",
+      "value": "100",
+      "type": "string",
+      "description": "The firmware asks for 100 and keeps at most NOTAM_MAX = 40 after filtering."
+    }
+  ],
+  "item": [
+    {
+      "name": "01 Token (client_credentials)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Fail LOUDLY rather than send an empty grant: autorouter answers 400 for",
+              "// missing credentials and 400 for wrong ones, so an empty run looks exactly",
+              "// like a typo and sends you checking your password.",
+              "const u = pm.collectionVariables.get('user');",
+              "const p = pm.collectionVariables.get('pass');",
+              "if (!u || !p) {",
+              "    throw new Error('user/pass are empty — set them in an ENVIRONMENT, ' +",
+              "                    'not in the committed collection.');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// The token is stored for the other requests. Nothing else in this",
+              "// collection mints one: twenty per account, seven days each.",
+              "if (pm.response.code === 200) {",
+              "    const d = pm.response.json();",
+              "    pm.collectionVariables.set('token', d.access_token);",
+              "    const days = (d.expires_in || 0) / 86400;",
+              "    console.log('token stored, valid ~' + days.toFixed(1) + ' day(s)');",
+              "    pm.test('200 + access_token', function () {",
+              "        pm.expect(d.access_token, 'access_token').to.be.a('string').and.not.empty;",
+              "    });",
+              "} else {",
+              "    // THE TWO 403s. Reading the code alone and telling the user to open a",
+              "    // support ticket is the mistake this block exists to prevent.",
+              "    let err = '';",
+              "    try { err = (pm.response.json() || {}).error || ''; } catch (e) { /* not JSON */ }",
+              "    if (err === 'toomanytokens') {",
+              "        console.log('403 toomanytokens — NOTHING to ask anyone. The account is ' +",
+              "                    'fine, it simply holds 20 ACTIVE tokens (7 days each). ' +",
+              "                    'Wait for the oldest to expire, or revoke them from your ' +",
+              "                    'autorouter account. Do NOT open a ticket.');",
+              "    } else if (pm.response.code === 403) {",
+              "        console.log('403 privileges — the credentials are VALID and the account ' +",
+              "                    'is active, but API access is a separate permission. ' +",
+              "                    'Request it through an autorouter support ticket.');",
+              "    } else if (pm.response.code === 400 || pm.response.code === 401) {",
+              "        console.log('credentials refused (account e-mail / password).');",
+              "    }",
+              "    pm.test('token obtained', function () {",
+              "        pm.expect.fail('HTTP ' + pm.response.code + ' ' +",
+              "                       (err ? '(' + err + ') ' : '') + '— see the console.');",
+              "    });",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/x-www-form-urlencoded"
+          }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "grant_type", "value": "client_credentials", "type": "text" },
+            { "key": "client_id", "value": "{{user}}", "type": "text" },
+            { "key": "client_secret", "value": "{{pass}}", "type": "text" }
+          ]
+        },
+        "url": {
+          "raw": "{{base}}/oauth2/token",
+          "host": ["{{base}}"],
+          "path": ["oauth2", "token"]
+        },
+        "description": "The grant is `client_credentials`, and the pair is NOT an API key: `client_id` is your account e-mail and `client_secret` your account password. Run this ONCE — the token is stored in `{{token}}` and reused. Re-run only after a 401/403 on a NOTAM call."
+      }
+    },
+    {
+      "name": "02 NOTAM — aerodrome",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get('token')) {",
+              "    throw new Error('no token — run \"01 Token\" first (and only once: ' +",
+              "                    '20 active tokens per account).');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (pm.response.code === 401 || pm.response.code === 403) {",
+              "    console.log('refused with the stored token — clear {{token}} and re-run ' +",
+              "                '\"01 Token\" ONCE. If a BRAND NEW token is refused too, it is ' +",
+              "                'not staleness: check API access on the account.');",
+              "}",
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "",
+              "if (pm.response.code === 200) {",
+              "    const d = pm.response.json();",
+              "    const rows = d.rows || [];",
+              "    pm.test('rows[] present', () => pm.expect(rows).to.be.an('array'));",
+              "",
+              "    // THE FIELDS THE FIRMWARE ACTUALLY READS (ArduinoJson filter,",
+              "    // fetchNotam). A silent rename upstream would empty the screen without",
+              "    // any HTTP error, which is the failure this assertion is for.",
+              "    if (rows.length) {",
+              "        const NEEDED = ['series', 'number', 'year', 'code23', 'code45',",
+              "                        'purpose', 'startvalidity', 'endvalidity', 'iteme'];",
+              "        pm.test('the fields flight-radar parses are all present', function () {",
+              "            NEEDED.forEach(k => pm.expect(rows[0], k).to.have.property(k));",
+              "        });",
+              "    }",
+              "",
+              "    // THE SAME COUNT AS THE ROBOT, and the reason it differs from `total`.",
+              "    // The API returns everything PUBLISHED, next week's included; the screen",
+              "    // shows what is in force NOW, briefing filter applied. The tool once",
+              "    // listed 27 while the screen said 6 and nothing explained the gap.",
+              "    const now = Math.floor(Date.now() / 1000);",
+              "    const inForce = rows.filter(n => (n.startvalidity || 0) <= now &&",
+              "                                     now <= (n.endvalidity || 0));",
+              "    // 1. checklists (Q) KKKK) are dropped outright by the firmware",
+              "    const noChk = inForce.filter(n => !(n.code23 === 'KK' && n.code45 === 'KK'));",
+              "    // 2. briefing filter (notam_brief): rank M and any unknown purpose",
+              "    const rank = p => (p || '').startsWith('NBO') ? 0 :",
+              "                      (p || '').startsWith('BO')  ? 1 :",
+              "                      (p || '').startsWith('B')   ? 2 : 3;",
+              "    const brief = noChk.filter(n => rank(n.purpose) < 3);",
+              "    const CAP = 40;   // NOTAM_MAX",
+              "    console.log('total published : ' + (d.total !== undefined ? d.total : rows.length));",
+              "    console.log('in force now    : ' + inForce.length);",
+              "    console.log('minus checklists: ' + noChk.length);",
+              "    console.log('briefing filter : ' + brief.length);",
+              "    console.log('-> the screen shows min(' + brief.length + ', ' + CAP + ') with ' +",
+              "                'notam_brief=1, min(' + noChk.length + ', ' + CAP + ') with 0');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{base}}/notam?itemas=%5B%22{{icao}}%22%5D&offset=0&limit={{limit}}",
+          "host": ["{{base}}"],
+          "path": ["notam"],
+          "query": [
+            {
+              "key": "itemas",
+              "value": "%5B%22{{icao}}%22%5D",
+              "description": "A JSON ARRAY, percent-encoded: %5B %22 = [ \" and %22%5D = \" ]. Sending a bare ICAO code is rejected."
+            },
+            { "key": "offset", "value": "0" },
+            { "key": "limit", "value": "{{limit}}" }
+          ]
+        },
+        "description": "One aerodrome. This is the request the radar makes when `notam_fir` is empty.\n\nThe console prints the SAME funnel as the firmware — published, in force, minus checklists, briefing filter — because the raw `total` and what the screen shows answer different questions, and the gap between them looks like a bug when it is not."
+      }
+    },
+    {
+      "name": "03 NOTAM — aerodrome + FIR",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "if (!pm.collectionVariables.get('token')) {",
+              "    throw new Error('no token — run \"01 Token\" first.');",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+              "if (pm.response.code === 200) {",
+              "    const rows = (pm.response.json().rows) || [];",
+              "    const fir = pm.collectionVariables.get('fir');",
+              "    const icao = pm.collectionVariables.get('icao');",
+              "    // What the FIR ADDS is the point of this request: en-route items",
+              "    // (airspace, navaids) that an aerodrome query never returns.",
+              "    const only = rows.filter(n => JSON.stringify(n.itemas || n.itema || '')",
+              "                                    .indexOf(icao) < 0).length;",
+              "    console.log(rows.length + ' row(s) for ' + icao + '+' + fir +",
+              "                ', of which ~' + only + ' are not aerodrome items');",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer {{token}}" }
+        ],
+        "url": {
+          "raw": "{{base}}/notam?itemas=%5B%22{{icao}}%22,%22{{fir}}%22%5D&offset=0&limit={{limit}}",
+          "host": ["{{base}}"],
+          "path": ["notam"],
+          "query": [
+            {
+              "key": "itemas",
+              "value": "%5B%22{{icao}}%22,%22{{fir}}%22%5D",
+              "description": "Two items in the same array — same request, same TLS session, same token. Costs nothing extra."
+            },
+            { "key": "offset", "value": "0" },
+            { "key": "limit", "value": "{{limit}}" }
+          ]
+        },
+        "description": "Aerodrome AND its FIR, which is what the radar sends when `notam_fir` is set. An aerodrome query returns only what is filed against that aerodrome; airspace and navaid NOTAMs are filed against the FIR and are invisible without this."
+      }
+    },
+    {
+      "name": "04 Token — deliberate failure (wrong password)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Proves the ERROR path, which is the half nobody exercises until it",
+              "// matters. Deliberately sends a bad secret; a 200 here would mean the",
+              "// endpoint is not checking what you think it is.",
+              "pm.test('bad credentials are refused (400/401/403)', function () {",
+              "    pm.expect([400, 401, 403]).to.include(pm.response.code);",
+              "});",
+              "let err = '';",
+              "try { err = (pm.response.json() || {}).error || ''; } catch (e) {}",
+              "console.log('HTTP ' + pm.response.code + (err ? ' error=' + err : ''));",
+              "pm.test('this did NOT overwrite the good token', function () {",
+              "    pm.expect(pm.collectionVariables.get('token')).to.not.be.empty;",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+        ],
+        "body": {
+          "mode": "urlencoded",
+          "urlencoded": [
+            { "key": "grant_type", "value": "client_credentials", "type": "text" },
+            { "key": "client_id", "value": "{{user}}", "type": "text" },
+            { "key": "client_secret", "value": "definitely-not-the-password", "type": "text" }
+          ]
+        },
+        "url": {
+          "raw": "{{base}}/oauth2/token",
+          "host": ["{{base}}"],
+          "path": ["oauth2", "token"]
+        },
+        "description": "A refusal on purpose, to see the shape of an error before you meet one for real — and to confirm a failed attempt does not burn the stored token.\n\nIt does NOT consume one of your twenty: a refused grant issues nothing."
+      }
+    },
+    {
+      "name": "05 NOTAM — deliberate failure (bad token)",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test('a bad bearer is refused (401/403)', function () {",
+              "    pm.expect([401, 403]).to.include(pm.response.code);",
+              "});",
+              "console.log('This is the code the firmware treats as \"stale token\": it ' +",
+              "            're-authenticates and retries ONCE, and only when the token came ' +",
+              "            'from its cache. Refused again with a FRESH token, it stops — ' +",
+              "            'insisting would burn the twenty-token allowance on a request ' +",
+              "            'that is not going to work.');"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [
+          { "key": "Authorization", "value": "Bearer not-a-real-token" }
+        ],
+        "url": {
+          "raw": "{{base}}/notam?itemas=%5B%22{{icao}}%22%5D&offset=0&limit=5",
+          "host": ["{{base}}"],
+          "path": ["notam"],
+          "query": [
+            { "key": "itemas", "value": "%5B%22{{icao}}%22%5D" },
+            { "key": "offset", "value": "0" },
+            { "key": "limit", "value": "5" }
+          ]
+        },
+        "description": "Shows what a stale or revoked token looks like — the case the firmware handles with exactly one re-authentication."
+      }
+    }
+  ]
+}

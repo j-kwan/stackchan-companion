@@ -1,0 +1,15 @@
+# exemple.csv — chorégraphie personnalisée StackChan-Eyes v2
+# Une ligne = une keyframe : yaw,pitch,servoMs,holdMs,emotion,lid,gazeY
+#   yaw     : offset ° depuis le centre (+ = droite observateur, clampé ±130)
+#   pitch   : offset ° depuis l'horizon (- = tête relevée, clampé -74..+6)
+#   servoMs : durée du mouvement servo ; holdMs : durée totale de la keyframe
+#   emotion : nom (Normal, Happy, Glee, Surprised...) ou vide = inchangée
+#   lid     : 0 | blink | winkG | winkD (ou 1/2/3)
+#   gazeY   : biais vertical du regard -1..1 (plonger par les YEUX)
+# Règles : docs/reference/CHOREGRAPHIES.md §6 — la keyframe de sortie
+# Normal+neutre est ajoutée automatiquement si absente.
+0,0,200,250,Happy,0,0
+25,-8,400,700,Glee,winkG,0
+-25,-8,400,700,,0,0
+0,-14,250,900,Surprised,blink,0
+0,0,450,600,Normal,0,0

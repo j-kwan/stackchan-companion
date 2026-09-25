@@ -1,0 +1,35 @@
+# /dances/haro_float.csv — flottement simule (oscillation CONTINUE) — REV 2
+#
+# CE QUI A CHANGE, ET POURQUOI. La version 1 ecrivait servoMs=300 / holdMs=600.
+# Or `holdMs` est la duree TOTALE de la keyframe, pas un supplement
+# (behavior/Sequencer.h:44) : la tete bougeait 300 ms puis restait IMMOBILE
+# 300 ms, a chaque pas. Un flottement fait de moities immobiles n'est pas un
+# flottement, c'est une suite de hochements. Ici holdMs == servoMs partout :
+# la tete ne s'arrete jamais avant la derniere image.
+#
+# Le pitch est un OFFSET et le signe compte : NEGATIF = tete LEVEE
+# (Sequencer.h:42). Monter puis redescendre, c'est le bon sens pour une chose
+# qui flotte. L'amplitude decroit (4 -> 3 -> 2 -> 1) : une oscillation qui
+# s'amortit se lit comme de la flottaison, une oscillation constante se lit
+# comme un mecanisme. Butees : HOME 93, min 19 -> -4 donne 89, tres au large.
+#
+# gazeY suit la tete d'un cheveu (les yeux derivent vers le haut avec elle),
+# jamais a l'oppose : "eyes lead, head follows" veut dire que le regard
+# ACCOMPAGNE, il ne contredit pas.
+#
+# AUCUN changement d'emotion avant la fin : la version 1 enchainait
+# Happy -> Sleepy -> Normal en cinq secondes, trois humeurs pour un seul geste.
+# Une emotion vide = inchangee, donc le flottement se pose sur l'expression du
+# moment et n'en impose aucune. La derniere image DOIT etre Normal + pose
+# neutre, sinon la roulette reste bloquee (Dances.h).
+#
+# yaw,pitch,servoMs,holdMs,emotion,lid,gazeY
+0,-4,500,500,,0,-0.15
+0,0,500,500,,0,0
+0,-3,500,500,,0,-0.12
+0,0,500,500,,0,0
+0,-2,550,550,,0,-0.08
+0,0,550,550,,0,0
+0,-1,600,600,,0,-0.04
+0,0,600,600,,0,0
+0,0,300,400,Normal,blink,0

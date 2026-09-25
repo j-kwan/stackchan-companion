@@ -1,0 +1,27 @@
+{
+  "name": "StackChan-Companion",
+  "version": "1.0.1",
+  "description": "Expressive companion firmware and rendering engine for StackChan (M5Stack CoreS3, kit K151): gyroscopic VOR, 30 expressions, 15 dances, REST API, web console.",
+  "keywords": ["m5stack", "stackchan", "avatar", "face", "eyes", "robot", "esp32", "animation"],
+  "authors": [
+    {
+      "name": "Joel Kwan"
+    }
+  ],
+  "license": "AGPL-3.0-or-later",
+  "frameworks": "arduino",
+  "platforms": "espressif32",
+  "dependencies": [
+    {
+      "name": "m5stack-avatar",
+      "version": "^0.10.0"
+    },
+    {
+      "name": "M5Unified",
+      "version": "^0.2.0"
+    }
+  ],
+  "build": {
+    "srcDir": "src"
+  }
+}
