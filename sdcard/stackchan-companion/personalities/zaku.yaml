@@ -1,0 +1,16 @@
+# Zaku — une personnalite ECRITE SUR LA CARTE, jamais compilee.
+# Elle existe pour prouver qu'un caractere peut naitre sans recompiler.
+# Toute cle absente garde le defaut : ce fichier dit des DIFFERENCES.
+name: zaku
+rules: /stackchan-companion/rules.txt      # reutilise les regles par defaut
+color: 0xFF4422                       # rouge Zaku
+theme: gundam
+roulette:
+  enabled: 1
+  min_ms: 5000
+  max_ms: 11000
+weights:
+  Normal: 1.0
+  Focused: 0.5
+  Suspicious: 0.3
+  Annoyed: 0.2

@@ -1,0 +1,30 @@
+# led-fluid — reglages du bin invite (detail : docs/guests/LED-FLUID.md)
+#
+# Les memes cles se reglent au doigt (swipe droite = physique et rendu,
+# swipe gauche = teinte, saturation et luminosite) et sur http://<ip>/config.
+# Le bin REECRIT ce fichier en entier a chaque sauvegarde : les commentaires
+# ajoutes a la main n y survivent pas, les valeurs si.
+
+# --- physique -----------------------------------------------------------
+particles: 240        # 60-400, le cout principal
+dot_pitch: 12         # 8-20 px, le pas de la grille de pastilles
+viscosity: 30         # 0-100, de l eau au miel
+gravity: 100          # 0-200 %, 0 = apesanteur
+bounce: 25            # 0-90 %, restitution aux parois
+trail: 60             # 0-95 %, la trainee lumineuse
+gyro_gain: 100        # 0-200 %, rotation en tourbillon, secousse en impulsion
+
+# --- rendu --------------------------------------------------------------
+hue: 200              # 0-359
+sat: 85               # 0-100, le PLAFOND de saturation
+bright: 120           # 10-255, la dalle
+leds: 0               # echo du fluide sur les 12 WS2812 du K151
+sound: 0              # petit son a l eclaboussure
+auto_bright: 0        # luminosite suivie sur le LTR-553
+
+# --- mapping des axes ---------------------------------------------------
+# Valide pour les vitesses gyroscopiques, PAS pour le vecteur gravite : si le
+# fluide part du mauvais cote, c est ici que ca se corrige, sans recompiler.
+tilt_swap: 0
+tilt_inv_x: 0
+tilt_inv_y: 0

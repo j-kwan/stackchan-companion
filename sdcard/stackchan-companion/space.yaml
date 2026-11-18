@@ -1,0 +1,40 @@
+# space.yaml - instrument spatial (docs/guests/SPACE.md)
+# Bin invite : ISS/SGP4 calcule a bord, passages, Lune, planetes, lancements.
+#
+# ATTENTION : le firmware REECRIT ce fichier a chaque sauvegarde depuis la page
+# /config - il le TRONQUE et le regenere depuis sa propre liste, donc les
+# commentaires ci-dessous sont perdus a la premiere sauvegarde. C'est le meme
+# contrat que config.yaml. Les valeurs montrees sont les defauts compiles :
+# une cle absente retombe dessus.
+
+# ---- L'OBSERVATEUR. Sans carte et sans /config, c'est Paris - et un ciel
+# calcule pour le mauvais endroit ressemble exactement a un ciel juste.
+lat: 48.8566
+lon: 2.3522
+alt_m: 35
+
+# Decalage UTC en HEURES DECIMALES (l'Inde vaut 5.5, le Nepal 5.75) : la meme
+# cle et la meme unite que flight-radar.
+# ABSENTE, la valeur du companion (config.yaml) l'emporte ; ecrite ici, c'est
+# celle-ci qui gagne - et elle n'est reecrite dans ce fichier que si elle
+# venait bien d'ici ou de /config, jamais heritee en silence du companion.
+# tz_offset_h: 1.0
+
+# ---- LE SATELLITE SUIVI, par son numero NORAD. 25544 = ISS (ZARYA).
+norad: 25544
+
+# Passage ignore si sa culmination reste sous cet angle, en degres : plus bas,
+# c'est la ligne des toits.
+min_pass_el: 10
+
+# Periode d'interrogation de l'API de lancements, en minutes. PLANCHER 15 :
+# c'est la limite de debit du service, pas une preference.
+launch_poll_min: 30
+
+# ---- L'ECRAN.
+theme: 0             # 0..3, voir docs/guests/SPACE.md
+bright: 110          # retroeclairage (10..255)
+auto_bright: 1       # suit le LTR-553 s'il repond (voir `diag` sur /config)
+auto_night: 1        # theme sombre entre coucher et lever REELS du soleil
+metric: 1            # 1 = km, 0 = milles
+dock_s: 0            # cycle automatique des vues, en secondes ; 0 = jamais
