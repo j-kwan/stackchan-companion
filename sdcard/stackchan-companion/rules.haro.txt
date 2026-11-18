@@ -1,0 +1,105 @@
+# =========================================================================
+# PERSONNALITE 1 - HARO
+# =========================================================================
+# Charge par `personality=1` (behavior/Personalities.h). Une seule
+# personnalite est chargee a la fois : ce fichier dispose donc des 21 places
+# entieres, et AUCUNE regle n'a besoin de gate de personnalite - le FICHIER
+# est le gate.
+#
+# CE QUI SEPARE CE JEU DE CELUI PAR DEFAUT. Les regles par defaut commentent
+# la TELEMETRIE du robot : batterie, lumiere, reseau, camera. C'est juste,
+# mais cela decrit une machine qui parle d'elle-meme. Un Haro est un
+# COMPAGNON : il est defini par sa relation a quelqu'un. Les regles
+# ci-dessous regardent donc d'abord la PERSONNE - le bruit qu'elle fait, la
+# lumiere qu'elle allume, le travail qu'elle mene - et ne gardent de la
+# telemetrie que ce qui merite d'etre dit a voix haute.
+#
+# LES DEUX PIEGES DU FORMAT (identiques a rules.txt, redits ici parce qu'un
+# fichier de regles doit pouvoir etre lu seul) :
+#  (1) UN CHAMP ABSENT VAUT ZERO. `RuleEngine::evalRule` lit
+#      `getF(field, 0.0f)` sans tester l'existence : toute regle `lt`/`le`
+#      avec un seuil > 0 sur un champ optionnel est VRAIE tant que le champ
+#      n'existe pas. Sur un champ optionnel : comparer a un CODE NON NUL
+#      avec `eq`, jamais a zero avec `le`.
+#  (2) LE PLAFOND EST SILENCIEUX. MAX_RULES = 24, dont 3 built-ins.
+#      Au-dela, `RuleEngine::add` renvoie false SANS RIEN DIRE.
+#      Ce fichier en compte 16 -> 5 places libres.
+#
+# LES DANSES haro_* VIENNENT DE LA CARTE, et une regle peut les jouer depuis
+# le deblocage du 09-14 : `PlayDance` transporte desormais le NOM et le resout
+# au DECLENCHEMENT contre la liste fusionnee (compilees + /dances/*.csv), au
+# lieu de memoriser un index au parse. Il le fallait : au demarrage les regles
+# sont lues AVANT `danceStore.reload()`, donc la banque est vide quand ce
+# fichier est analyse - un index n'aurait rien pu designer. Verifier que les
+# quatre CSV sont bien dans /dances/ sur la carte ; si l'une manque, la regle
+# le DIT en serie au lieu de ne rien faire.
+#
+# La roulette de cette personnalite est ETROITE (Normal, Happy, Glee,
+# Curious, Surprised, Excited) : rien de sombre ne sort au repos. C'est ce
+# qui donne leur POIDS aux regles ci-dessous - quand Worried apparait, cela
+# ne peut venir que de ce qui vient de se passer.
+# =========================================================================
+
+# --- LA PERSONNE ---------------------------------------------------------
+# LA CARESSE. Le champ `head` vaut 1 tant qu'une main est sur la tete, 0 quand
+# elle part (Si12T, publie par loop() depuis le 09-14). C'est un ETAT et non un
+# evenement : le retour a 0 est ce qui RE-ARME la regle, donc une caresse
+# declenche une fois, quelle que soit sa duree.
+# `sustainMs` 400 : assez pour distinguer une vraie caresse d'un frolement,
+# assez court pour que la reponse arrive pendant qu'on a encore la main dessus.
+# Sans capteur Si12T le champ n'existe jamais, donc `ge 1` ne peut pas firer -
+# c'est le bon sens de comparaison ici (piege 1).
+| head | ge | 1 | 400 | 8000 | PlayDance | haro_call
+
+# Un Haro repond. Le gate `mic` protege du piege (1) : sans micro actif, le
+# champ n'existe pas et rien ne fire.
+# Un bruit fort : il sursaute, puis revient vite a lui (2 s, pas 15).
+mic | micL | gt | 0.7 | 200 | 4000 | SetEmotion | Surprised | 2000
+mic | micR | gt | 0.7 | 200 | 4000 | SetEmotion | Surprised | 2000
+# On lui parle (niveau soutenu, pas un claquement) : il s'interesse.
+mic | micL | gt | 0.4 | 2000 | 15000 | SetEmotion | Curious | 6000
+# Une conversation qui dure : il s'egaye et le montre.
+mic | micR | gt | 0.4 | 8000 | 60000 | PlayDance | haro_call
+
+# --- LA PIECE ------------------------------------------------------------
+# Gate `dark_sleepy` : main.cpp ne publie `light` que si le LTR-553 repond,
+# donc le gate garantit AUSSI la presence du capteur (piege 1).
+# Seuil 55 et non 80 : light_pct = 100*ln(v+1)/ln(4096), et l'etalonnage
+# mesure dit "bureau eclaire ~50-100 counts" derriere la coque K151. 80 %
+# exigerait 775 counts - inatteignable. 55 % ~ 100 counts.
+# On allume : il se reveille.
+dark_sleepy | light | gt | 55 | 1500 | 30000 | PlayDance | haro_float
+# La piece s'assombrit : il s'assoupit doucement. Le mode nuit built-in fait
+# deja dormir la roulette ; ceci n'est que le moment de bascule.
+dark_sleepy | light | lt | 25 | 8000 | 120000 | SetEmotion | Sleepy | 10000
+
+# --- LE TRAVAIL (pomodoro) -----------------------------------------------
+# `tmr_ph` est l'enum Phase brut, et c'est le bon champ :
+#   Idle=0 Run=1 Paused=2 Ring=3 Work=4 Break=5 Done=6 Hydrate=7
+# NE PAS utiliser `tmr_st`, qui est un CODE COULEUR non monotone (Work et Run
+# partagent 1, Break/Hydrate/Done partagent 4) : `tmr_st ge 3` attrape la
+# sonnerie mais aussi chaque pause, et `ge 1` tout sauf Idle.
+# Ces trois regles dorment si band_mode n'est ni 4 ni 5 : les champs tmr_*
+# ne sont alors pas publies. C'est correct, pas casse.
+| tmr_ph | eq | 4 | 3000 | 60000 | SetEmotion | Focused | 12000
+| tmr_ph | eq | 3 | 0 | 20000 | PlayDance | haro_call
+| tmr_ph | eq | 5 | 1000 | 60000 | SetEmotion | Glee | 8000
+| tmr_ph | eq | 7 | 0 | 60000 | SetEmotion | Questioning | 6000
+
+# --- SON ETAT A LUI ------------------------------------------------------
+# Ce qu'un Haro dit de lui-meme, reduit a ce qui compte vraiment.
+# ATTENTION : `batt` vaut -1 si le PMIC est inconnu, et -1 < 12 est VRAI.
+# Sur cette carte l'AXP2101 repond ; si ces regles firent sans raison au
+# demarrage, c'est la piste.
+| batt | lt | 12 | 0 | 120000 | SetEmotion | Worried | 12000
+| chg | ge | 1 | 1500 | 60000 | PlayDance | haro_float
+# Pas de reseau du tout (rssi vaut 0 en AP ou deconnecte - toujours publie,
+# donc `eq 0` est ici le bon test et non un piege).
+| rssi | eq | 0 | 10000 | 300000 | PlayDance | shakeNo
+
+# --- LES SCRIPTS PC ------------------------------------------------------
+# Convention en CODES NON NULS a cause du piege (1) : 1 = en cours,
+# 2 = succes, 3 = echec. Champ absent = 0 = aucune regle ne correspond.
+#   POST /api/field?build=1  puis  ?build=2  ou  ?build=3
+| build | eq | 2 | 0 | 10000 | PlayDance | haro_roll
+| build | eq | 3 | 0 | 10000 | SetEmotion | Frustrated | 12000

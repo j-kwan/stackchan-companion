@@ -1,0 +1,11 @@
+# /dances/haro_call.csv — appel "Haro, Haro !" (wiggle + wink)
+# yaw,pitch,servoMs,holdMs,emotion,lid,gazeY
+0,0,150,300,Happy,0,0
+15,0,200,400,,0,0
+-15,0,200,400,,0,0
+15,0,200,400,,winkG,0
+-15,0,200,400,,0,0
+10,-2,200,400,Glee,0,0
+-10,-2,200,400,,winkD,0
+0,0,200,400,,blink,0
+0,0,300,400,Normal,0,0

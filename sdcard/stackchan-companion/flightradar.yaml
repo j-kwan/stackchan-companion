@@ -1,0 +1,77 @@
+# flightradar.yaml - configuration du .bin invite flight-radar (docs/guests/README.md)
+# Position du centre du radar (degres decimaux) + rayon de recherche.
+# Editable depuis la console (gestionnaire de fichiers SD) sans recompiler.
+lat: -20.89          # defaut : La Reunion (aeroport Roland-Garros)
+lon: 55.53
+radius_nm: 250       # rayon de recherche en nm (10..500 ; >250 = pavage
+                     # multi-requetes centre + 6 satellites, dedup par hex)
+poll_s: 10           # periode de rafraichissement API en secondes (5..60)
+api: airplanes.live  # source : airplanes.live | adsb.lol | adsb.fi | safesky
+                     # (airplanes.live = meilleure couverture ocean Indien
+                     # mesuree 2026-07-25 ; safesky = FLARM/planeurs/UAV,
+                     # EXIGE safesky_key ci-dessous)
+safesky_key: ""      # clef API SafeSky (essai gratuit 30 j). A saisir plutot
+                     # depuis http://<ip>/config : jamais reaffichee, "-"
+                     # l'effface. Sans clef, la source safesky est refusee.
+metar_icao: ""       # station METAR (swipe haut). Vide = `airport` s'il est
+                     # en ICAO 4 lettres (aviationweather.gov ignore l'IATA)
+metar_rwy: ""        # piste dessinee dans la rose des vents de la vue METAR,
+                     # forme "numeros@cap_vrai" - ex. FMEE : "12/30@102".
+                     # VIDE = piste PRINCIPALE de la station, lue dans
+                     # /stackchan-companion/runways.csv (base OurAirports, domaine
+                     # public, regeneree par tools/make-runways.py). Ce reglage
+                     # est PRIORITAIRE : il sert a forcer une piste secondaire
+                     # ou a couvrir un terrain absent de la base. Le NUMERO
+                     # n'est pas le cap (magnetique, arrondi a la dizaine) :
+                     # FMEE 12/30 fait 102/282 vrais, 18 deg d'ecart. La forme
+                     # courte "12/30" est acceptee mais approximative (x10).
+                     # Ni reglage ni base = la rose s'affiche seule.
+notam_brief: 1       # NOTAM deck: 1 = hide rank M ("miscellaneous, not
+                     # normally briefed"). Measured on FMEE, SEVEN of the
+                     # thirteen NOTAMs in force were rank M - more than half
+                     # the deck was pages you page past. ON by default.
+notam_user: ""       # compte autorouter.aero (e-mail) et mot de passe : la
+notam_pass: ""       # source NOTAM (base EUROCONTROL EAD, gratuite). Il n'y a
+                     # PAS de clef API - l'OAuth2 "client_credentials"
+                     # d'autorouter reutilise LE COMPTE. Ce couple ouvre donc
+                     # tout le compte (il peut deposer des plans de vol), pas
+                     # un flux en lecture seule : a saisir de preference depuis
+                     # http://<ip>/config, ou notam_pass est un Secret jamais
+                     # reaffiche ("-" l'efface).
+                     # ATTENTION : un compte ACTIVE ne suffit pas, l'acces API
+                     # est une permission a demander par ticket support - sans
+                     # elle le jeton repond 403 "privileges" (verifie 07-31).
+                     # Vide = la vue NOTAM le dit et n'ouvre aucune connexion.
+airport: RUN         # optionnel : code IATA (RUN) ou ICAO (FMEE) - resolu
+                     # au boot via hexdb.io, PRIORITAIRE sur lat/lon
+tz_offset_h: 4       # fuseau local vs UTC (Reunion +4) - heures du panneau
+brightness: 100      # retroeclairage ecran (10..255) - slider en swipe droite
+# 0 Gundam | 1 Gundam nuit (orange sature) | 2 Scope (ATC phosphore
+# vert) | 3 Scope nuit (ASTRO : noir + rouge pur, facon Stellarium).
+# Les themes vont par PAIRES jour/nuit :
+# auto_night bascule vers l'impair (theme | 1) et revient le matin.
+# ATTENTION : la numerotation a change le 2026-07-28 - theme: 1 designait
+# Scope auparavant.
+theme: 2
+units: aero        # aero (nm/kt/ft) | metrique (km/km-h/m)
+# --- Options (bascules du panneau de reglages, swipe droite) -------------
+servo: 0             # 1 = la tete pointe vers le vol traque (OFF par defaut)
+volume: 0            # volume des chirps (accrochage / urgence) en %, 0..100.
+                     # 0 = MUET, et c'est le seul "off" : un drapeau on/off en
+                     # plus du niveau donnerait deux facons d'etre silencieux.
+                     # 0 par defaut (un bin invite ne fait pas de bruit sans
+                     # qu'on le lui demande). REDUIT DE MOITIE la nuit, sur la
+                     # meme regle que le theme Nuit (auto_night, coucher-lever reels)
+                     # - un chirp juste en plein jour fait sursauter a 23 h.
+                     # Reglable aussi a l'ecran : curseur de l'onglet RADAR du
+                     # panneau de reglages (swipe droite), par pas de 5 %, qui
+                     # joue un exemple AU niveau en cours de reglage.
+                     # L'ancienne cle `sound: 0|1` est encore lue, uniquement
+                     # pour migrer une carte ecrite avant ce niveau.
+auto_bright: 1       # luminosite auto (LTR-553), plancher 60
+auto_night: 1        # theme Nuit automatique du coucher au lever du soleil
+                     # (calcule depuis lat/lon, pas une fenetre horaire fixe)
+show_ground: 1       # 0 = masquer le trafic au sol
+follow: 0            # 1 = traquer automatiquement le plus proche
+# NB : radius_nm se regle au ZOOM (pincee 2 doigts sur le radar,
+#      double-tap = paliers 50/100/250/500 nm)
